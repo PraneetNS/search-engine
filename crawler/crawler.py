@@ -2,6 +2,8 @@ import requests
 from collections import deque
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from indexer.storage import save_index, load_index
+save_index(idx.index, idx.doc_lengths)
 
 class Crawler:
     def __init__(self, max_pages=50):

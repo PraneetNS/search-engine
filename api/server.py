@@ -6,6 +6,23 @@ from flask import Flask, request, jsonify
 from crawler.crawler import Crawler
 from indexer.inverted_index import InvertedIndex
 from search.query import search
+from indexer.storage import save_index, load_index
+save_index(idx.index, idx.doc_lengths)
+try:
+    index_data, doc_lengths = load_index()
+    idx.index = index_data
+    idx.doc_lengths = doc_lengths
+    docs = None   # No need for docs list until needed
+    print("Loaded index from file, skipping crawl.")
+except:
+    print("No saved index found, crawling now...")
+    pages = crawler.crawl("https://en.wikipedia.org/wiki/India")
+
+    for url, text in pages.items():
+        idx.add_document(url, text)
+
+    docs = pages
+    save_index(idx.index, idx.doc_lengths)
 
 app = Flask(__name__)
 

@@ -1,5 +1,8 @@
 from collections import defaultdict
 import math
+from crawler.parser import clean
+words = clean(text)
+
 
 class InvertedIndex:
     def __init__(self):

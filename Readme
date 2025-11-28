@@ -1,0 +1,124 @@
+Mini Search Engine (TF-IDF + Semantic Search + Autocomplete)
+
+A fully functional search engine built from scratch — including a web crawler, inverted index, TF-IDF ranking, semantic search using MiniLM embeddings, and autocomplete using Trie, with a React UI front-end.
+
+🚀 Live Links
+Component	URL
+Frontend	(after deployment)
+Backend API	(after deployment)
+🌟 Features
+Feature	Description
+Web Crawler	Crawls Wikipedia pages and extracts titles, text & images
+Inverted Index	Maps keywords → documents
+TF-IDF Ranking	Scores results based on keyword relevance
+Semantic Search	BERT embeddings (MiniLM) for meaning-based search
+Autocomplete	Trie-based prefix search suggestions
+Search UI	Real-time search with suggestions & result cards
+Image & Snippet Preview	Google-style view
+Deployment	Backend on Render, Frontend on Vercel
+🧠 Tech Stack
+Backend
+
+Python (Flask)
+
+TF-IDF Ranking
+
+Sentence Transformers (MiniLM)
+
+BeautifulSoup / Requests (crawler)
+
+Gunicorn (production)
+
+Render deployment
+
+Frontend
+
+React.js
+
+Live autocomplete
+
+Highlighted keywords
+
+Deployed on Vercel
+
+🛠 System Architecture Diagram
+┌──────────────┐      crawl       ┌──────────────┐
+│ Web Crawler  │ ───────────────► │ Wikipedia     │
+└──────┬───────┘                  └──────────────┘
+       │ extracted pages
+       ▼
+┌──────────────┐   build index   ┌──────────────────┐
+│ InvertedIndex│◄───────────────►│ TF-IDF / Semantic │
+└──────┬───────┘                └──────────────────┘
+       │ search results
+       ▼
+┌───────────────────────┐
+│ Flask API /search     │
+│ /suggest /semantic     │
+└────────┬──────────────┘
+         │ JSON
+         ▼
+┌────────────────────────┐
+│ React Frontend (UI)    │
+│ Autocomplete + Cards   │
+└────────────────────────┘
+
+🧪 Example Query Response
+{
+  "query": "national anthem",
+  "results": [
+    {
+      "url": "https://en.wikipedia.org/wiki/Jana_Gana_Mana",
+      "title": "Jana Gana Mana - Wikipedia",
+      "snippet": "National anthem of India ...",
+      "score": 0.0318
+    }
+  ]
+}
+
+🧭 Setup Guide (Local)
+1️⃣ Backend
+cd Search_engine
+pip install -r requirements.txt
+python api/server.py
+
+2️⃣ Frontend
+cd search-ui
+npm install
+npm start
+
+🧑‍💻 How It Works Internally
+
+Crawls pages & extracts text
+
+Builds inverted index {term: {doc: count}}
+
+Computes TF-IDF (term_frequency / doc_length) * log(total/docs_with_term)
+
+Computes semantic cosine similarity
+
+Returns sorted results combined
+
+React fetches & displays cards + autocomplete
+
+🎤 Interview Pitch (use this)
+
+I built a fully functional search engine from scratch using Python and React.
+It uses a custom web crawler, an inverted index, TF-IDF scoring, semantic search using MiniLM,
+and autocomplete via Trie. I deployed the backend on Render and the frontend on Vercel.
+This project demonstrates search infrastructure design similar to real search engines like Google.
+
+🧾 Future Enhancements
+
+Distributed crawling
+
+PageRank score addition
+
+Image & news search
+
+Vector database (FAISS / Pinecone)
+
+⭐ Support & Feedback
+
+If you like this project, please ⭐ star the repo
+and feel free to open issues or contribute!

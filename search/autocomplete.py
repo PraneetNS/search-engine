@@ -15,6 +15,14 @@ class Trie:
             cur = cur.children[ch]
         cur.is_end = True
 
+    def _dfs(self, node, prefix):
+        results = []
+        if node.is_end:
+            results.append(prefix)
+        for ch, nxt in node.children.items():
+            results.extend(self._dfs(nxt, prefix + ch))
+        return results
+
     def autocomplete(self, prefix):
         cur = self.root
         for ch in prefix:
@@ -23,13 +31,3 @@ class Trie:
             cur = cur.children[ch]
 
         return self._dfs(cur, prefix)
-
-    def _dfs(self, node, prefix):
-        results = []
-        if node.is_end:
-            results.append(prefix)
-
-        for ch, child in node.children.items():
-            results += self._dfs(child, prefix + ch)
-
-        return results

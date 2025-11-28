@@ -3,67 +3,109 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from crawler.crawler import Crawler
 from indexer.inverted_index import InvertedIndex
 from search.query import search
 from indexer.storage import save_index, load_index
-save_index(idx.index, idx.doc_lengths)
-try:
-    index_data, doc_lengths = load_index()
-    idx.index = index_data
-    idx.doc_lengths = doc_lengths
-    docs = None   # No need for docs list until needed
-    print("Loaded index from file, skipping crawl.")
-except:
-    print("No saved index found, crawling now...")
-    pages = crawler.crawl("https://en.wikipedia.org/wiki/India")
-
-    for url, text in pages.items():
-        idx.add_document(url, text)
-
-    docs = pages
-    save_index(idx.index, idx.doc_lengths)
+from search.autocomplete import Trie
+from search.semantics import SemanticSearch
 
 app = Flask(__name__)
+CORS(app)
 
-# ---- Crawl ONCE at startup ----
-crawler = Crawler(max_pages=50)
-pages = crawler.crawl("https://en.wikipedia.org/wiki/India")
 
-print("CRAWLED PAGES:", len(pages))
-for url, text in pages.items():
-    print("URL:", url)
-    print("TEXT SNIPPET:", text[:300])
-    break  # Print only first page
+# ---------------------
+# LOAD OR BUILD INDEX
+# ---------------------
 
-print("PAGES LIST:", list(pages.keys())[:5])
-
-# ---- Build index ----
 idx = InvertedIndex()
-for url, text in pages.items():
-    print(url, "->", text[:200])
+docs = {}
+print("DOCS COUNT:", len(docs))
+print("FIRST DOCS:", list(docs.keys())[:3])
+semantic = SemanticSearch()
+semantic.build_embeddings(docs)
+print("Semantic embeddings built for", len(semantic.embeddings), "docs")
+
+try:
+    index_data, doc_lengths, stored_docs = load_index()
+    idx.index = index_data
+    idx.doc_lengths = doc_lengths
+    docs = stored_docs
+    print("Loaded index & docs from storage.")
+except:
+    print("Index not found — crawling now...")
+    crawler = Crawler(max_pages=50)
+    docs = crawler.crawl("https://en.wikipedia.org/wiki/India")
+
+    for url, data in docs.items():
+        idx.add_document(url, data["text"])
+
+    save_index(idx.index, idx.doc_lengths, docs)
+    print("Index & docs saved.")
 
 
-print("INDEX SIZE:", len(idx.index))
-docs = pages
+# ---------------------
+# BUILD AUTOCOMPLETE TRIE
+# ---------------------
 
+trie = Trie()
+for word in idx.index.keys():
+    trie.insert(word)
+print("Trie loaded with", len(idx.index), "words.")
 
-# ---- Home Route ----
+# ---------------------
+# ROUTES
+# ---------------------
+
 @app.get("/")
 def home():
-    return {"message": "Mini Search Engine is running. Use /search?q=your_term"}
+    return {"message": "Mini Search Engine running. Try /search?q=text or /suggest?q=pre"}
 
-
-# ---- Search Route ----
 @app.get("/search")
 def perform_search():
-    query = request.args.get("q")
-    print("QUERY RECEIVED:", query)
+    query = request.args.get("q", "")
+    results = search(query, idx, total_docs=len(idx.doc_lengths))
 
-    results = search(query, idx, total_docs=len(docs))
-    print("RESULTS:", results)
+    formatted = []
+    for url, score in results[:10]:
+        doc = docs.get(url, {})
+        formatted.append({
+            "url": url,
+            "title": doc.get("title", url),
+            "snippet": doc.get("text", "")[:250] + "...",
+            "image": doc.get("image"),
+            "score": score,
+        })
 
-    return jsonify({"query": query, "results": results[:10]})
+    print("QUERY:", query)
+    print("RESULTS:", formatted[:2])  # quick debug
+    return jsonify(formatted)
+
+
+
+
+@app.get("/suggest")
+def suggest():
+    prefix = request.args.get("q", "")
+    suggestions = trie.autocomplete(prefix)
+    return jsonify(suggestions[:10])
+@app.get("/search_semantic")
+def search_semantic():
+    query = request.args.get("q", "")
+    results = semantic.search(query, top_k=10)
+
+    formatted = []
+    for url, score in results:
+        doc = docs.get(url, {})
+        formatted.append({
+            "url": url,
+            "title": doc.get("title", url),
+            "snippet": doc.get("text", "")[:250] + "...",
+            "score": score,
+        })
+
+    return jsonify(formatted)
 
 
 if __name__ == "__main__":

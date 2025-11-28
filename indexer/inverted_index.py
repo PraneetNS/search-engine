@@ -1,16 +1,15 @@
 from collections import defaultdict
 import math
 from crawler.parser import clean
-words = clean(text)
 
 
 class InvertedIndex:
     def __init__(self):
-        self.index = defaultdict(dict)  # word -> {doc: freq}
-        self.doc_lengths = {}
+        self.index = defaultdict(dict)  # word -> {doc_id: frequency}
+        self.doc_lengths = {}           # doc_id -> word count
 
     def add_document(self, doc_id, text):
-        words = text.lower().split()
+        words = clean(text)             # use cleaned words
         self.doc_lengths[doc_id] = len(words)
 
         for word in words:

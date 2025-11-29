@@ -11,3 +11,18 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+body.dark {
+  background-color: #121212;
+  color: white;
+}
+
+body.dark input {
+  background-color: #1e1e1e;
+  color: white;
+  border: 1px solid #444;
+}
+
+body.dark .result-card {
+  background-color: #1e1e1e !important;
+  box-shadow: 0 2px 8px rgba(255,255,255,0.05) !important;
+}

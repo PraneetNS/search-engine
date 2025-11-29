@@ -15,6 +15,7 @@ class Crawler:
 
         while self.queue and len(pages) < self.max_pages:
             url = self.queue.popleft()
+
             if url in self.visited:
                 continue
 
@@ -25,36 +26,39 @@ class Crawler:
                 response = requests.get(url, headers=headers, timeout=7)
                 soup = BeautifulSoup(response.text, "html.parser")
 
-                # Select content block
                 content = soup.select_one("div.mw-parser-output")
                 if not content:
                     continue
 
-                # Extract clean page text
+                # Extract valid text
                 full_text = content.get_text(separator=" ", strip=True)
 
-                # Extract image (OpenGraph first, then fallback)
+                # Find first featured image
                 og_image = soup.find("meta", property="og:image")
-                if og_image and og_image.get("content"):
-                    image_url = og_image["content"]
-                else:
-                    first_img = content.find("img")
-                    image_url = (
-                        "https:" + first_img["src"]
-                        if first_img and first_img.get("src", "").startswith("//")
-                        else None
-                    )
+                image_url = og_image["content"] if og_image else None
 
-                # Save page info
+                if not image_url:
+                    first_img = content.find("img")
+                    if first_img and first_img.get("src", "").startswith("//"):
+                        image_url = "https:" + first_img["src"]
+
+                # Derive category from URL
+                try:
+                    category = url.split("/wiki/")[1].split("_")[0]
+                except:
+                    category = "general"
+
+                # Store result
                 pages[url] = {
-                    "title": soup.title.string.strip() if soup.title else url,
+                    "title": soup.title.string if soup.title else url,
                     "text": full_text,
                     "image": image_url,
+                    "category": category.lower()
                 }
 
                 self.visited.add(url)
 
-                # Add new links to queue
+                # Queue discovery links
                 for link in soup.find_all("a", href=True):
                     href = link["href"]
                     if href.startswith("/wiki/") and ":" not in href:

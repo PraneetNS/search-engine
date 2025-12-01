@@ -12,7 +12,10 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
+const API_BASE = "http://127.0.0.1:5000";
+
 function App() {
+  const [user, setUser] = useState(() => localStorage.getItem("user") || "");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [semanticResults, setSemanticResults] = useState([]);
@@ -20,43 +23,48 @@ function App() {
   const [trending, setTrending] = useState([]);
   const [trendGraph, setTrendGraph] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [history, setHistory] = useState([]);
+
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("all"); // all | semantic | images | trending
   const [visibleCount, setVisibleCount] = useState(10);
 
+  const userParam = user ? `&user=${encodeURIComponent(user)}` : "";
+
   // -------------- LOAD AUX DATA --------------
   const loadTrending = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:5000/trending");
-      setTrending(await res.json());
-    } catch (err) {
-      console.log("Failed to fetch trending", err);
-    }
+    const res = await fetch(`${API_BASE}/trending`);
+    setTrending(await res.json());
   };
 
   const loadGraph = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:5000/trending_graph");
-      setTrendGraph(await res.json());
-    } catch (err) {
-      console.log("Failed to fetch graph", err);
-    }
+    const res = await fetch(`${API_BASE}/trending_graph`);
+    setTrendGraph(await res.json());
   };
 
   const loadCategories = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:5000/categories");
-      setCategories(await res.json());
-    } catch (err) {
-      console.log("Failed to fetch categories", err);
-    }
+    const res = await fetch(`${API_BASE}/categories`);
+    setCategories(await res.json());
+  };
+
+  const loadHistory = async () => {
+    const res = await fetch(`${API_BASE}/user_history?user=${encodeURIComponent(user || "guest")}`);
+    setHistory(await res.json());
   };
 
   useEffect(() => {
     loadTrending();
     loadGraph();
     loadCategories();
-  }, []);
+    if (user) loadHistory();
+    // eslint-disable-next-line
+  }, [user]);
+
+  // -------------- USER SAVE --------------
+  const saveUser = () => {
+    localStorage.setItem("user", user);
+    loadHistory();
+  };
 
   // -------------- SEARCH --------------
   const search = async () => {
@@ -66,17 +74,16 @@ function App() {
     if (activeTab === "all" && selectedCategory) {
       params.append("category", selectedCategory);
     }
+    if (user) {
+      params.append("user", user);
+    }
 
     if (activeTab === "semantic") {
-      const res = await fetch(
-        `http://127.0.0.1:5000/search_semantic?${params.toString()}`
-      );
+      const res = await fetch(`${API_BASE}/search_semantic?${params.toString()}`);
       const data = await res.json();
       setSemanticResults(data);
     } else {
-      const res = await fetch(
-        `http://127.0.0.1:5000/search?${params.toString()}`
-      );
+      const res = await fetch(`${API_BASE}/search?${params.toString()}`);
       const data = await res.json();
       setResults(data);
     }
@@ -84,6 +91,7 @@ function App() {
     setVisibleCount(10);
     await loadTrending();
     await loadGraph();
+    if (user) await loadHistory();
   };
 
   // -------------- AUTOCOMPLETE --------------
@@ -91,7 +99,9 @@ function App() {
     setQuery(value);
     if (!value.trim()) return setSuggestions([]);
 
-    const res = await fetch(`http://127.0.0.1:5000/suggest?q=${value}`);
+    const res = await fetch(
+      `${API_BASE}/suggest?q=${encodeURIComponent(value)}${userParam}`
+    );
     setSuggestions(await res.json());
   };
 
@@ -99,12 +109,10 @@ function App() {
   const startVoiceSearch = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
-
     if (!SpeechRecognition) {
       alert("Voice search not supported in this browser.");
       return;
     }
-
     const rec = new SpeechRecognition();
     rec.lang = "en-IN";
     rec.onresult = (e) => {
@@ -126,7 +134,7 @@ function App() {
     current = current.filter((r) => r.image);
   }
   if (activeTab === "trending") {
-    current = []; // show only trending graph/list for this tab
+    current = []; // trending tab only shows trending info
   }
   const slicedResults = current.slice(0, visibleCount);
 
@@ -139,9 +147,47 @@ function App() {
         margin: "auto",
       }}
     >
-      <h1 style={{ textAlign: "center", fontSize: "40px", marginBottom: "10px" }}>
+      <h1 style={{ textAlign: "center", fontSize: "40px", marginBottom: "5px" }}>
         🔍 Mini Search Engine
       </h1>
+
+      {/* USER / LOGIN ROW */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "8px",
+          marginBottom: "15px",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontSize: "14px" }}>User:</span>
+        <input
+          value={user}
+          onChange={(e) => setUser(e.target.value)}
+          placeholder="your-name or email"
+          style={{
+            padding: "6px 10px",
+            borderRadius: "16px",
+            border: "1px solid #ccc",
+            minWidth: "200px",
+          }}
+        />
+        <button
+          onClick={saveUser}
+          style={{
+            padding: "6px 12px",
+            borderRadius: "16px",
+            border: "none",
+            backgroundColor: "#0078ff",
+            color: "white",
+            cursor: "pointer",
+            fontSize: "13px",
+          }}
+        >
+          Save
+        </button>
+      </div>
 
       {/* TABS */}
       <div
@@ -286,7 +332,45 @@ function App() {
         )}
       </div>
 
-      {/* TRENDING + GRAPH (always visible; extra nice when Trending tab) */}
+      {/* PERSONALIZED HISTORY */}
+      <div style={{ marginTop: "20px", textAlign: "center" }}>
+        <h3>🕒 Your recent searches</h3>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}
+        >
+          {history.map((h, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setQuery(h);
+                search();
+              }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "16px",
+                border: "none",
+                backgroundColor: "#f3f3f3",
+                cursor: "pointer",
+                fontSize: "13px",
+              }}
+            >
+              {h}
+            </button>
+          ))}
+          {history.length === 0 && (
+            <span style={{ fontSize: "13px", opacity: 0.7 }}>
+              No history yet — try searching something 🙂
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* TRENDING + GRAPH */}
       <div style={{ marginTop: "25px", textAlign: "center" }}>
         <h3>🔥 Trending Searches</h3>
         <div

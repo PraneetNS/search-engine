@@ -12,114 +12,84 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-const API_BASE = "http://127.0.0.1:5000";
-
 function App() {
-  const [user, setUser] = useState(() => localStorage.getItem("user") || "");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
-  const [semanticResults, setSemanticResults] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [trending, setTrending] = useState([]);
   const [trendGraph, setTrendGraph] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [serverQueryInfo, setServerQueryInfo] = useState(null);
+const [mode, setMode] = useState("keyword"); // 'keyword' | 'semantic'
 
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [activeTab, setActiveTab] = useState("all"); // all | semantic | images | trending
-  const [visibleCount, setVisibleCount] = useState(10);
-
-  const userParam = user ? `&user=${encodeURIComponent(user)}` : "";
-
-  // -------------- LOAD AUX DATA --------------
+  // Load trending
   const loadTrending = async () => {
-    const res = await fetch(`${API_BASE}/trending`);
-    setTrending(await res.json());
+    try {
+      const res = await fetch("http://127.0.0.1:5000/trending");
+      const data = await res.json();
+      setTrending(data);
+    } catch (err) {
+      console.log("Failed to fetch trending");
+    }
   };
 
   const loadGraph = async () => {
-    const res = await fetch(`${API_BASE}/trending_graph`);
-    setTrendGraph(await res.json());
-  };
-
-  const loadCategories = async () => {
-    const res = await fetch(`${API_BASE}/categories`);
-    setCategories(await res.json());
-  };
-
-  const loadHistory = async () => {
-    const res = await fetch(`${API_BASE}/user_history?user=${encodeURIComponent(user || "guest")}`);
-    setHistory(await res.json());
+    try {
+      const res = await fetch("http://127.0.0.1:5000/trending_graph");
+      const data = await res.json();
+      setTrendGraph(data);
+    } catch (err) {
+      console.log("Failed to fetch graph");
+    }
   };
 
   useEffect(() => {
     loadTrending();
     loadGraph();
-    loadCategories();
-    if (user) loadHistory();
-    // eslint-disable-next-line
-  }, [user]);
+  }, []);
+<div className="flex justify-center gap-4 mb-3">
+  <button
+    className={`px-4 py-1 rounded-full text-sm ${
+      mode === "keyword" ? "bg-blue-600 text-white" : "bg-gray-200"
+    }`}
+    onClick={() => setMode("keyword")}
+  >
+    Keyword
+  </button>
+  <button
+    className={`px-4 py-1 rounded-full text-sm ${
+      mode === "semantic" ? "bg-blue-600 text-white" : "bg-gray-200"
+    }`}
+    onClick={() => setMode("semantic")}
+  >
+    Semantic
+  </button>
+</div>
 
-  // -------------- USER SAVE --------------
-  const saveUser = () => {
-    localStorage.setItem("user", user);
-    loadHistory();
-  };
-
-  // -------------- SEARCH --------------
+  // Search
   const search = async () => {
-    if (!query.trim()) return;
+  if (!query.trim()) return;
+  const endpoint =
+    mode === "semantic" ? "search_semantic" : "search";
 
-    const params = new URLSearchParams({ q: query });
-    if (activeTab === "all" && selectedCategory) {
-      params.append("category", selectedCategory);
-    }
-    if (user) {
-      params.append("user", user);
-    }
+  const res = await fetch(`http://127.0.0.1:5000/${endpoint}?q=${query}`);
+  const data = await res.json();
 
-    if (activeTab === "semantic") {
-      const res = await fetch(`${API_BASE}/search_semantic?${params.toString()}`);
-      const data = await res.json();
-      setSemanticResults(data);
-    } else {
-      const res = await fetch(`${API_BASE}/search?${params.toString()}`);
-      const data = await res.json();
-      setResults(data);
-    }
+  if (Array.isArray(data)) {
+    setResults(data);                      // semantic
+  } else {
+    setResults(data.results || []);        // keyword
+  }
+};
 
-    setVisibleCount(10);
-    await loadTrending();
-    await loadGraph();
-    if (user) await loadHistory();
-  };
 
-  // -------------- AUTOCOMPLETE --------------
+  // Autocomplete
   const autocomplete = async (value) => {
     setQuery(value);
     if (!value.trim()) return setSuggestions([]);
 
-    const res = await fetch(
-      `${API_BASE}/suggest?q=${encodeURIComponent(value)}${userParam}`
-    );
-    setSuggestions(await res.json());
-  };
-
-  // -------------- VOICE SEARCH --------------
-  const startVoiceSearch = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice search not supported in this browser.");
-      return;
-    }
-    const rec = new SpeechRecognition();
-    rec.lang = "en-IN";
-    rec.onresult = (e) => {
-      const text = e.results[0][0].transcript;
-      setQuery(text);
-    };
-    rec.start();
+    const res = await fetch(`http://127.0.0.1:5000/suggest?q=${value}`);
+    const data = await res.json();
+    setSuggestions(data);
   };
 
   const highlight = (text, term) => {
@@ -128,190 +98,36 @@ function App() {
     return text.replace(regex, "<mark>$1</mark>");
   };
 
-  // -------------- RESULT SELECTION --------------
-  let current = activeTab === "semantic" ? semanticResults : results;
-  if (activeTab === "images") {
-    current = current.filter((r) => r.image);
-  }
-  if (activeTab === "trending") {
-    current = []; // trending tab only shows trending info
-  }
-  const slicedResults = current.slice(0, visibleCount);
-
   return (
-    <div
-      style={{
-        padding: "30px 20px 60px",
-        fontFamily: "Inter, Arial",
-        maxWidth: "1000px",
-        margin: "auto",
-      }}
-    >
-      <h1 style={{ textAlign: "center", fontSize: "40px", marginBottom: "5px" }}>
+    <div className="min-h-screen px-8 py-10 bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-all duration-300">
+      {/* Title */}
+      <h1 className="text-4xl font-bold text-center mb-6">
         🔍 Mini Search Engine
       </h1>
 
-      {/* USER / LOGIN ROW */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "8px",
-          marginBottom: "15px",
-          alignItems: "center",
-        }}
-      >
-        <span style={{ fontSize: "14px" }}>User:</span>
-        <input
-          value={user}
-          onChange={(e) => setUser(e.target.value)}
-          placeholder="your-name or email"
-          style={{
-            padding: "6px 10px",
-            borderRadius: "16px",
-            border: "1px solid #ccc",
-            minWidth: "200px",
-          }}
-        />
-        <button
-          onClick={saveUser}
-          style={{
-            padding: "6px 12px",
-            borderRadius: "16px",
-            border: "none",
-            backgroundColor: "#0078ff",
-            color: "white",
-            cursor: "pointer",
-            fontSize: "13px",
-          }}
-        >
-          Save
-        </button>
-      </div>
-
-      {/* TABS */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "12px",
-          marginBottom: "15px",
-        }}
-      >
-        {[
-          { id: "all", label: "All" },
-          { id: "semantic", label: "Semantic" },
-          { id: "images", label: "Images" },
-          { id: "trending", label: "Trending" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "999px",
-              border: "none",
-              cursor: "pointer",
-              backgroundColor:
-                activeTab === tab.id ? "#0078ff" : "rgba(0,0,0,0.05)",
-              color: activeTab === tab.id ? "white" : "black",
-              fontWeight: 500,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* SEARCH BAR + CATEGORY + VOICE */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          position: "relative",
-          gap: "10px",
-          alignItems: "center",
-        }}
-      >
+      {/* Search UI */}
+      <div className="flex justify-center gap-3 relative">
+        
         <input
           value={query}
           onChange={(e) => autocomplete(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
           placeholder="Search anything..."
-          style={{
-            padding: "13px 18px",
-            width: "450px",
-            fontSize: "18px",
-            borderRadius: "30px",
-            border: "1px solid #ddd",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          }}
+          className="w-1/2 px-5 py-3 rounded-full border shadow-md text-black text-lg focus:ring-2 focus:ring-blue-500 outline-none"
         />
 
         <button
-          onClick={startVoiceSearch}
-          title="Voice search"
-          style={{
-            padding: "10px 12px",
-            borderRadius: "50%",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          🎤
-        </button>
-
-        {activeTab === "all" && (
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            style={{
-              padding: "10px",
-              borderRadius: "20px",
-              border: "1px solid #ddd",
-            }}
-          >
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <button
           onClick={search}
-          style={{
-            padding: "12px 22px",
-            borderRadius: "30px",
-            fontSize: "16px",
-            backgroundColor: "#0078ff",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-          }}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold transition-all"
         >
           Search
         </button>
+          
+  
 
+        {/* Suggestions dropdown */}
         {suggestions.length > 0 && (
-          <ul
-            style={{
-              listStyle: "none",
-              position: "absolute",
-              top: "52px",
-              width: "450px",
-              backgroundColor: "white",
-              borderRadius: "8px",
-              border: "1px solid #ddd",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-              maxHeight: "200px",
-              overflowY: "auto",
-              padding: "10px 0",
-              zIndex: 10,
-            }}
-          >
+          <ul className="absolute top-14 w-1/2 bg-white text-black rounded-xl shadow-lg max-h-60 overflow-y-auto p-2">
             {suggestions.map((s, i) => (
               <li
                 key={i}
@@ -319,11 +135,7 @@ function App() {
                   setQuery(s);
                   setSuggestions([]);
                 }}
-                style={{
-                  padding: "10px 15px",
-                  cursor: "pointer",
-                  fontSize: "17px",
-                }}
+                className="p-3 cursor-pointer hover:bg-gray-200 rounded-lg"
               >
                 {s}
               </li>
@@ -332,56 +144,10 @@ function App() {
         )}
       </div>
 
-      {/* PERSONALIZED HISTORY */}
-      <div style={{ marginTop: "20px", textAlign: "center" }}>
-        <h3>🕒 Your recent searches</h3>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "10px",
-            flexWrap: "wrap",
-          }}
-        >
-          {history.map((h, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setQuery(h);
-                search();
-              }}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "16px",
-                border: "none",
-                backgroundColor: "#f3f3f3",
-                cursor: "pointer",
-                fontSize: "13px",
-              }}
-            >
-              {h}
-            </button>
-          ))}
-          {history.length === 0 && (
-            <span style={{ fontSize: "13px", opacity: 0.7 }}>
-              No history yet — try searching something 🙂
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* TRENDING + GRAPH */}
-      <div style={{ marginTop: "25px", textAlign: "center" }}>
-        <h3>🔥 Trending Searches</h3>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "10px",
-            flexWrap: "wrap",
-            marginBottom: "15px",
-          }}
-        >
+      {/* Trending Section */}
+      <div className="mt-10 text-center">
+        <h2 className="text-2xl font-semibold mb-3">🔥 Trending Searches</h2>
+        <div className="flex justify-center gap-3 flex-wrap">
           {trending.map((t, i) => (
             <button
               key={i}
@@ -389,104 +155,73 @@ function App() {
                 setQuery(t);
                 search();
               }}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "20px",
-                backgroundColor: "#eee",
-                border: "none",
-                cursor: "pointer",
-              }}
+              className="bg-white dark:bg-gray-700 dark:text-white text-black text-sm px-4 py-2 rounded-full shadow hover:scale-105 transition duration-300"
             >
               {t}
             </button>
           ))}
         </div>
-
-        <div style={{ maxWidth: "700px", margin: "0 auto" }}>
-          <Line
-            data={{
-              labels: trendGraph.map((v) => v.term),
-              datasets: [
-                {
-                  data: trendGraph.map((v) => v.count),
-                  borderColor: "#0078ff",
-                  tension: 0.4,
-                },
-              ],
-            }}
-          />
-        </div>
       </div>
+<a
+  href={r.url}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-xl font-bold text-blue-700 dark:text-blue-400"
+>
+  {r.title}
+</a>
 
-      {/* RESULTS */}
-      {activeTab !== "trending" && (
-        <div style={{ marginTop: "30px" }}>
-          {slicedResults.map((r, i) => (
-            <div
-              key={i}
-              style={{
-                marginBottom: "25px",
-                padding: "18px",
-                borderRadius: "12px",
-                backgroundColor: "white",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-              }}
-            >
-              {r.image && activeTab === "images" && (
-                <img
-                  src={r.image}
-                  alt=""
-                  style={{
-                    width: "180px",
-                    borderRadius: "10px",
-                    marginBottom: "10px",
-                    marginRight: "10px",
-                    float: "right",
-                  }}
-                />
-              )}
+      {/* Trend graph */}
+      <div className="mt-10 p-5 bg-white dark:bg-gray-800 rounded-xl shadow-xl">
+        <Line
+          data={{
+            labels: trendGraph.map((v) => v.term),
+            datasets: [
+              {
+                label: "Search Count",
+                data: trendGraph.map((v) => v.count),
+                borderColor: "#0078ff",
+                tension: 0.4,
+              },
+            ],
+          }}
+        />
+      </div>
+{serverQueryInfo?.corrected && (
+  <div className="mt-4 text-center text-sm">
+    Did you mean{" "}
+    <button
+      className="text-blue-600 underline"
+      onClick={() => {
+        setQuery(serverQueryInfo.usedQuery);
+        search();
+      }}
+    >
+      {serverQueryInfo.usedQuery}
+    </button>
+    ?
+  </div>
+)}
 
-              <a
-                href={r.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: "20px", color: "#1a0dab" }}
-              >
-                {r.title}
-              </a>
-              <p style={{ color: "green", fontSize: "14px", margin: "4px 0" }}>
-                {r.url}
-              </p>
-              <p
-                style={{ fontSize: "15px", lineHeight: 1.4 }}
-                dangerouslySetInnerHTML={{
-                  __html: highlight(r.snippet, query),
-                }}
-              />
-              <small style={{ opacity: 0.6 }}>
-                Score: {r.score ? r.score.toFixed(4) : "—"}
-              </small>
-            </div>
-          ))}
-
-          {current.length > visibleCount && (
-            <div style={{ textAlign: "center", marginTop: "10px" }}>
-              <button
-                onClick={() => setVisibleCount((c) => c + 10)}
-                style={{
-                  padding: "10px 18px",
-                  borderRadius: "20px",
-                  border: "none",
-                  cursor: "pointer",
-                  backgroundColor: "#eee",
-                }}
-              >
-                Load more
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Results */}
+      <div className="mt-10">
+        {results.map((r, i) => (
+          <div
+            key={i}
+            className="p-6 mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-transform hover:scale-[1.02]"
+          >
+            <a href={r.url} target="_blank" className="text-xl font-bold text-blue-700 dark:text-blue-400">
+              {r.title}
+            </a>
+            <p className="text-green-600">{r.url}</p>
+            <p
+              dangerouslySetInnerHTML={{ __html: highlight(r.snippet, query) }}
+              className="mt-2 text-lg"
+            />
+            <small className="opacity-60">Score: {r.score?.toFixed(4)}</small>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

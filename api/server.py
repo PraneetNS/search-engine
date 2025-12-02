@@ -12,6 +12,12 @@ from indexer.inverted_index import InvertedIndex
 from indexer.storage import save_index, load_index
 from search.query import search, build_snippet
 from search.autocomplete import Trie
+from search.spell import Speller
+speller = Speller(vocabulary=idx.index.keys())
+from search.semantic import SemanticSearch
+
+semantic = SemanticSearch(docs)
+print("Semantic vectors built for", len(docs), "docs")
 
 # ---------------------------
 # Optional Redis (still safe)
@@ -286,19 +292,20 @@ def home():
 @app.get("/search")
 def perform_search():
     query = request.args.get("q", "").strip()
-    category = request.args.get("category", "").strip().lower()
 
-    filtered_docs = docs
-    if category:
-        filtered_docs = {
-            url: data
-            for url, data in docs.items()
-            if data.get("category", "").lower() == category
-        }
+    # spell correction
+    corrected, changed = speller.correct_query(query)
+    used_query = corrected if changed else query
 
-    total = max(len(filtered_docs), 1)
-    results = search(query, idx, filtered_docs, total_docs=total)
-    return jsonify(results[:50])
+    results = search(used_query, idx, docs, total_docs=len(docs))
+
+    return jsonify({
+        "query": query,
+        "used_query": used_query,
+        "corrected": changed,
+        "results": results[:10],
+    })
+
 
 
 @app.get("/search_semantic")
@@ -352,6 +359,23 @@ def recommended():
 def get_user_history():
     user = get_user_id()
     return jsonify(user_history.get(user, []))
+@app.get("/search_semantic")
+def search_semantic():
+    query = request.args.get("q", "").strip()
+    raw = semantic.search(query, top_k=10)
+
+    out = []
+    for doc_id, score in raw:
+        doc = docs.get(doc_id, {})
+        snippet = build_snippet(doc.get("text", ""), query)
+        out.append({
+            "url": doc_id,
+            "title": doc.get("title", doc_id),
+            "snippet": snippet,
+            "image": doc.get("image"),
+            "score": score,
+        })
+    return jsonify(out)
 
 
 if __name__ == "__main__":

@@ -50,3 +50,7 @@ def search(query, idx, docs, total_docs):
         })
 
     return results
+def quick_summary(text, max_sentences=2):
+    import re
+    sentences = re.split(r'(?<=[.!?]) +', text)
+    return " ".join(sentences[:max_sentences])

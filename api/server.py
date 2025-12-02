@@ -292,18 +292,24 @@ def home():
 @app.get("/search")
 def perform_search():
     query = request.args.get("q", "").strip()
+    category = request.args.get("category")
 
-    # spell correction
     corrected, changed = speller.correct_query(query)
     used_query = corrected if changed else query
 
-    results = search(used_query, idx, docs, total_docs=len(docs))
+    base_results = search(used_query, idx, docs, total_docs=len(docs))
+
+    if category:
+        base_results = [
+            r for r in base_results
+            if docs.get(r["url"], {}).get("category") == category
+        ]
 
     return jsonify({
         "query": query,
         "used_query": used_query,
         "corrected": changed,
-        "results": results[:10],
+        "results": base_results[:10],
     })
 
 
@@ -316,8 +322,14 @@ def perform_search_semantic_route():
 
 
 @app.get("/categories")
-def get_categories():
-    return jsonify(sorted(list(categories)))
+def categories():
+    cats = set()
+    for d in docs.values():
+        c = d.get("category")
+        if c:
+            cats.add(c)
+    return jsonify(sorted(list(cats)))
+
 
 
 @app.get("/suggest")
@@ -376,6 +388,22 @@ def search_semantic():
             "score": score,
         })
     return jsonify(out)
+from collections import Counter
+
+@app.get("/stats")
+def stats():
+    total_queries = sum(trending_storage.values())
+    unique_queries = len(trending_storage)
+
+    top_queries = sorted(
+        trending_storage.items(), key=lambda x: x[1], reverse=True
+    )[:10]
+
+    return jsonify({
+        "total_queries": total_queries,
+        "unique_queries": unique_queries,
+        "top_queries": [{"term": t, "count": c} for t, c in top_queries],
+    })
 
 
 if __name__ == "__main__":

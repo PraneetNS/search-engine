@@ -107,13 +107,3 @@ I built a fully functional search engine from scratch using Python and React.
 It uses a custom web crawler, an inverted index, TF-IDF scoring, semantic search using MiniLM,
 and autocomplete via Trie. I deployed the backend on Render and the frontend on Vercel.
 This project demonstrates search infrastructure design similar to real search engines like Google.
-
-🧾 Future Enhancements
-
-Distributed crawling
-
-PageRank score addition
-
-Image & news search
-
-Vector database (FAISS / Pinecone)

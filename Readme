@@ -63,19 +63,6 @@ Deployed on Vercel
 │ Autocomplete + Cards   │
 └────────────────────────┘
 
-🧪 Example Query Response
-{
-  "query": "national anthem",
-  "results": [
-    {
-      "url": "https://en.wikipedia.org/wiki/Jana_Gana_Mana",
-      "title": "Jana Gana Mana - Wikipedia",
-      "snippet": "National anthem of India ...",
-      "score": 0.0318
-    }
-  ]
-}
-
 🧭 Setup Guide (Local)
 1️⃣ Backend
 cd Search_engine
